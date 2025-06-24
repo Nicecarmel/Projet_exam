@@ -8,7 +8,6 @@ namespace App\Http\Controllers;
 use App\Models\Epreuve;
 use App\Models\Composer;
 use App\Models\Reponse;
-use App\Models\Question;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 
@@ -21,43 +20,62 @@ class ExamController extends Controller
         return view('etudiant.dashboard', compact('epreuves'));
     }
 
-    // 📝 Affiche l’épreuve à passer
-    public function showPassation(Epreuve $epreuve)
+    // 📋 Liste des épreuves disponibles
+    public function index()
     {
-        if ($epreuve->statut_ep !== 'validee') {
-            abort(403, 'Épreuve non disponible');
-        }
-
-        $etudiant = session('etudiant');
-
-        // Créer une nouvelle entrée dans `composers` si pas encore commencée
-        $composition = Composer::firstOrCreate(
-            [
-                'etudiant_id' => $etudiant->id_et,
-                'epreuve_id' => $epreuve->id_ep
-            ],
-            [
-                'statut' => 'en_cours',
-                'date_debut' => now(),
-                'date_fin' => null,
-                'note' => null
-            ]
-        );
-
-        return view('etudiant.compositions.passation', compact('epreuve'));
+        $epreuves = Epreuve::where('statut_ep', 'validee')->get();
+        return view('etudiant.compositions.index', compact('epreuves'));
     }
 
-    // 💾 Soumet les réponses
+    // 📝 Passer une épreuve
+   public function showPassation(Epreuve $epreuve)
+{
+    // Vérifie que l'étudiant est connecté
+    if (!session()->has('etudiant')) {
+        abort(403, 'Accès refusé : vous devez être connecté(e)');
+    }
+
+    // Récupère l’étudiant connecté
+    $etudiant = session('etudiant');
+
+    // Vérifie que l’épreuve est validée
+    if ($epreuve->statut_ep !== 'validee') {
+        abort(403, 'Cette épreuve n’est pas disponible pour le moment.');
+    }
+
+    // Vérifie si l’étudiant a déjà soumis cette épreuve
+    $composition = Composer::where([
+        'etudiant_id' => $etudiant->id_et,
+        'epreuve_id' => $epreuve->id_ep,
+    ])->first();
+
+    if ($composition && in_array($composition->statut, ['termine'])) {
+        return redirect()->route('etudiant.resultat', ['epreuve' => $epreuve->id_ep])
+                         ->with('info', 'Vous avez déjà soumis cette épreuve.');
+    }
+
+    // Met à jour ou crée une entrée dans composers
+    Composer::updateOrCreate(
+        [
+            'etudiant_id' => $etudiant->id_et,
+            'epreuve_id' => $epreuve->id_ep
+        ],
+        [
+            'statut' => 'en_cours',
+            'date_debut' => now()
+        ]
+    );
+
+    return view('etudiant.compositions.passation', compact('epreuve'));
+}
+
+    // 💾 Soumettre les réponses
     public function submitPassation(Request $request, Epreuve $epreuve)
     {
         $etudiant = session('etudiant');
-        $reponses = $request->input('reponses', []);
 
-        // Récupère ou crée la composition
-        $composition = Composer::firstOrCreate(
-            ['etudiant_id' => $etudiant->id_et, 'epreuve_id' => $epreuve->id_ep],
-            ['statut' => 'termine']
-        );
+        // Récupère toutes les réponses soumises
+        $reponses = $request->input('reponses', []);
 
         $note = 0;
 
@@ -66,56 +84,64 @@ class ExamController extends Controller
 
             if (!$question) continue;
 
-            // Enregistre la réponse
-            Reponse::updateOrCreate(
-                ['etudiant_id' => $etudiant->id_et, 'epreuve_id' => $epreuve->id_ep, 'question_id' => $question->id_ques],
-                [
-                    'reponse_text' => is_array($rep) ? null : $rep,
-                    'option_id' => is_array($rep) ? null : null,
-                    'point_obtenu' => $this->calculerPoints($rep, $question),
-                ]
-            );
+            // Enregistre chaque réponse dans la base
+            Reponse::create([
+                'etudiant_id' => $etudiant->id_et,
+                'epreuve_id' => $epreuve->id_ep,
+                'question_id' => $question->id_ques,
+                'option_id' => is_array($rep) ? $rep['id_op'] ?? null : null,
+                'reponse_text' => is_string($rep) ? $rep : ($rep['text'] ?? null),
+                'point_obtenu' => $this->calculerPoints($rep, $question),
+            ]);
 
+            // Calcule la note totale si notation auto
+             if ($epreuve->mode_notation_auto && in_array($question->type, ['qcm', 'vrai_faux'])) {
             $note += $this->calculerPoints($rep, $question);
+           }
         }
 
-        // Met à jour la note dans `composers`
-        $composition->update([
-            'note' => $note,
+        // Met à jour le statut dans `composers`
+        Composer::updateOrCreate(
+            ['etudiant_id' => $etudiant->id_et,
+             'epreuve_id' => $epreuve->id_ep
+            ],
+            [
+            'statut' => 'termine',
             'date_fin' => now(),
-            'statut' => 'corrige'
-        ]);
+            'note' => $note ?: null,
+            ]
+        );
 
         return redirect()->route('etudiant.resultat', ['epreuve' => $epreuve->id_ep])
                          ->with(['note' => $note, 'totalPoints' => $epreuve->questions->sum('point')]);
     }
 
-    // 🔢 Calcule les points obtenus selon le type de question
+    // 🔢 Méthode privée pour calculer les points
     private function calculerPoints($reponse, $question)
     {
-        if ($question->type === 'qcm' || $question->type === 'vrai_faux') {
-            $option = $question->options->find($reponse);
-            return $option && $option->correct ? $question->point : 0;
-        } elseif ($question->type === 'ouverte') {
-            return 0; // À corriger manuellement plus tard
-        } else {
-            return 0; // QROC, etc.
+        if (!in_array($question->type, ['qcm', 'vrai_faux'])) {
+            return 0; // Pas de correction automatique pour questions ouvertes
         }
+
+        // Cherche si l’option choisie est correcte
+        $option = $question->options->where('id_op', $reponse)->first();
+
+        return $option && $option->correct ? $question->point : 0;
     }
 
-    // 📊 Affiche les résultats après soumission
+
+    // 📊 Voir les résultats après épreuve
     public function resultat(Epreuve $epreuve)
     {
         $etudiant = session('etudiant');
 
-        // Récupère toutes les réponses de cet étudiant pour cette épreuve
         $reponses = Reponse::where('etudiant_id', $etudiant->id_et)
-                          ->where('epreuve_id', $epreuve->id_ep)
-                          ->with(['question', 'option'])
-                          ->get();
+            ->where('epreuve_id', $epreuve->id_ep)
+            ->with('question', 'option')
+            ->get();
 
-        $note = $reponses->sum('point_obtenu');
         $totalPoints = $epreuve->questions->sum('point');
+        $note = $reponses->sum('point_obtenu');
 
         return view('etudiant.compositions.resultats', compact('epreuve', 'reponses', 'note', 'totalPoints'));
     }

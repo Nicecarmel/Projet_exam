@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Matiere extends Model
 {
     protected $primaryKey = 'id_mat';
+    
     protected $fillable = ['libelle_mat', 'code_mat', 'obligatoire', 'filiere_id'];
 
     public function filiere()

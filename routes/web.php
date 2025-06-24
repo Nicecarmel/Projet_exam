@@ -31,18 +31,19 @@ Route::get('/login/admin', [AdministrateurLoginController::class, 'showLoginForm
 Route::post('/login/admin', [AdministrateurLoginController::class, 'login']);
 Route::post('/logout/admin', [AdministrateurLoginController::class, 'logout'])->name('admin.logout');
 
+
 // Tableau de bord étudiant
 Route::middleware(['auth.etudiant'])->prefix('etudiant')->group(function () {
+    // Dashboard
     Route::get('/dashboard', [ExamController::class, 'dashboard'])->name('etudiant.dashboard');
 
-    // Passation des épreuves
+    // Epreuves
     Route::prefix('epreuves')->group(function () {
+        Route::get('/', [ExamController::class, 'index'])->name('epreuves.etudiant.index');
         Route::get('/{epreuve}/passer', [ExamController::class, 'showPassation'])
              ->name('epreuves.etudiant.passation');
-
         Route::post('/{epreuve}/soumettre', [ExamController::class, 'submitPassation'])
              ->name('epreuves.etudiant.submit');
-
         Route::get('/{epreuve}/resultats', [ExamController::class, 'resultat'])
              ->name('etudiant.resultat');
     });

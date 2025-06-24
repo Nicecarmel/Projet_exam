@@ -41,7 +41,7 @@ return new class extends Migration
             $table->time('heure_fin')->nullable();
             $table->integer('duree_minutes')->nullable()->min(10)->max(300);
             $table->enum('statut_ep', ['brouillon', 'en_attente_validation', 'validee', 'refusee'])->default('brouillon');
-            $table->boolean('mode_notation_auto')->default(true);
+            $table->boolean('mode_notation_auto')->default(false);
 
             // Admin qui a validé/refusé l’épreuve
             $table->unsignedBigInteger('admin_id')->nullable();

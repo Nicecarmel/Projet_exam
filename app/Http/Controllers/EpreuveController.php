@@ -60,7 +60,7 @@ class EpreuveController extends Controller
             'heure_debut' => 'nullable',
             'heure_fin' => 'nullable',
             'duree_minutes' => 'nullable|integer|min:10|max:300',
-            'mode_notation_auto' => 'nullable|boolean',
+            'mode_notation_auto' => 'boolean',
         ]);
 
         $professeur = session('professeur');
@@ -78,7 +78,7 @@ class EpreuveController extends Controller
             'heure_debut' => $validated['heure_debut'] ?? null,
             'heure_fin' => $validated['heure_fin'] ?? null,
             'duree_minutes' => $validated['duree_minutes'] ?? null,
-            'mode_notation_auto' => $request->has('mode_notation_auto'),
+            'mode_notation_auto' => $request->input('mode_notation_auto', false),
             'professeur_id' => $professeur->id_prof,
             'matiere_id' => $matiere_id,
             'admin_id' => null, // Laisser vide tant que non validée

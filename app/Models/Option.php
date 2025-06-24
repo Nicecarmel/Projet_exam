@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Option extends Model
 {
+    protected $primaryKey = 'id_op'; // Clé primaire personnalisée
+    public $timestamps = true;
     protected $fillable = ['question_id', 'libelle_op', 'correct', 'ordre'];
     protected $table = 'options';
 

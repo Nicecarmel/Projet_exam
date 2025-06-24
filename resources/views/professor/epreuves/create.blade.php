@@ -42,7 +42,7 @@
                 <option value="">Sélectionnez un type</option>
                 <option value="qcm" {{ old('type_ep') == 'qcm' ? 'selected' : '' }}>QCM</option>
                 <option value="ecrit" {{ old('type_ep') == 'ecrit' ? 'selected' : '' }}>Écrit</option>
-                
+
             </select>
         </div>
 
@@ -84,9 +84,9 @@
             <div class="col-md-6">
                 <label class="form-label">Mode notation automatique</label><br>
                 <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="checkbox" name="mode_notation_auto" id="notationAuto"
+                    <input class="form-check-input" type="checkbox" name="mode_notation_auto" id="mode_notation_auto"
                         {{ old('mode_notation_auto') ? 'checked' : '' }}>
-                    <label class="form-check-label" for="notationAuto">
+                    <label class="form-check-label" for="mode_notation_auto">
                         Activer la correction automatique
                     </label>
                 </div>

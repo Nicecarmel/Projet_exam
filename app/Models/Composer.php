@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class Composer extends Model
 {
+    protected $primaryKey = 'id_compo'; // Clé primaire personnalisée
+    protected $table = 'composers';
+    public $timestamps = true;
     protected $fillable = [
         'etudiant_id', 'epreuve_id', 'statut', 'date_debut', 'date_fin', 'note', 'feedback'
     ];
@@ -24,8 +27,7 @@ class Composer extends Model
 
     public function reponses()
     {
-        return $this->hasMany(\App\Models\Reponse::class, 'etudiant_id', 'etudiant_id')
-                    ->where('epreuve_id', $this->epreuve_id);
+       return $this->hasMany(\App\Models\Reponse::class, 'composer_id', 'id_compo');
     }
 
 }

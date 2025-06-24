@@ -4,25 +4,53 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Epreuve;
 use App\Models\Reponse;
+use App\Models\Composer;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
 
 class ReponseController extends Controller
 {
-    public function store(Request $request)
+    // 📋 Historique des épreuves passées
+    public function index()
     {
-        // Déjà géré dans ExamController@store
+        $etudiant = session('etudiant');
+
+        $compositions = Composer::where('etudiant_id', $etudiant->id_et)
+            ->with('epreuve')
+            ->get();
+
+        // Assure-toi que chaque composition a des réponses
+        foreach ($compositions as $composition) {
+            if (!$composition->reponses->count()) {
+                // Optionnel : Redirige ou affiche un message
+                return redirect()->back()->with('error', 'Aucune réponse trouvée.');
+            }
+        }
+        return view('etudiant.reponses.index', compact('compositions'));
     }
 
-    public function showResults($id_et, $id_ep)
+    // 📄 Détails des réponses à une épreuve
+    public function show(Reponse $reponse)
     {
-        $reponses = Reponse::where('id_et', $id_et)
-            ->whereHas('question', function ($q) use ($id_ep) {
-                $q->where('id_ep', $id_ep);
-            })
+        // Vérifie que cette réponse appartient bien à l’étudiant connecté
+        if ($reponse->etudiant_id != session('etudiant')->id_et) {
+            abort(403);
+        }
+
+        // Récupère l'épreuve associée
+        $epreuve = $reponse->epreuve;
+
+        // Récupère toutes les réponses de cette épreuve
+        $reponses = $reponse->etudiant->reponses()
+            ->where('epreuve_id', $epreuve->id_ep)
             ->with('question', 'option')
             ->get();
 
-        return view('student.exams.show_results', compact('reponses'));
+        $note = $reponses->sum('point_obtenu');
+        $totalPoints = $epreuve->questions->sum('point');
+
+        return view('etudiant.reponses.show', compact('epreuve', 'reponses', 'note', 'totalPoints'));
     }
 }
